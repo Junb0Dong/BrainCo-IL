@@ -1,27 +1,43 @@
+from __future__ import annotations
+
 import logging
 import pathlib
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-import jax.numpy as jnp
+if TYPE_CHECKING:
+    from openpi.diffusion.policy import BrainCoDiffusionPolicy
+    import openpi.policies.policy as _policy
+    from openpi.training import config as _config
+    import openpi.transforms as transforms
 
-import openpi.models.model as _model
-import openpi.policies.policy as _policy
-import openpi.shared.download as download
-from openpi.training import checkpoints as _checkpoints
-from openpi.training import config as _config
-import openpi.transforms as transforms
+from openpi.diffusion.config import DiffusionTrainConfig
 
 
 def create_trained_policy(
-    train_config: _config.TrainConfig,
+    train_config: _config.TrainConfig | DiffusionTrainConfig,
     checkpoint_dir: pathlib.Path | str,
     *,
     repack_transforms: transforms.Group | None = None,
     sample_kwargs: dict[str, Any] | None = None,
     default_prompt: str | None = None,
     norm_stats: dict[str, transforms.NormStats] | None = None,
-) -> _policy.Policy:
-    """Create a JAX policy from a self-describing BrainCo checkpoint."""
+) -> _policy.Policy | BrainCoDiffusionPolicy:
+    """Create the runtime specified by a self-describing BrainCo checkpoint."""
+    if isinstance(train_config, DiffusionTrainConfig):
+        from openpi.diffusion.checkpoint import load_policy
+
+        if any(value is not None for value in (repack_transforms, sample_kwargs, default_prompt, norm_stats)):
+            raise ValueError("DP preprocessing and sampling are defined by its checkpoint")
+        return load_policy(checkpoint_dir)[1]
+
+    import jax.numpy as jnp
+
+    import openpi.models.model as _model
+    import openpi.policies.policy as _policy
+    import openpi.shared.download as download
+    from openpi.training import checkpoints as _checkpoints
+    import openpi.transforms as transforms
+
     repack_transforms = repack_transforms or transforms.Group()
     checkpoint_dir = download.maybe_download(str(checkpoint_dir))
 

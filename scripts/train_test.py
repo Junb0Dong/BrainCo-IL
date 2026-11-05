@@ -6,13 +6,12 @@ import pytest
 
 os.environ["JAX_PLATFORMS"] = "cpu"
 
-from openpi.training import config as _config
-
-from . import train
-
 
 @pytest.mark.parametrize("config_name", ["debug"])
 def test_train(tmp_path: pathlib.Path, config_name: str):
+    from openpi.training import config as _config  # noqa: PLC0415
+    from scripts import train  # noqa: PLC0415
+
     config = dataclasses.replace(
         _config._CONFIGS_DICT[config_name],  # noqa: SLF001
         batch_size=2,
@@ -24,7 +23,9 @@ def test_train(tmp_path: pathlib.Path, config_name: str):
         log_interval=1,
     )
     train.main(config)
+    assert (config.checkpoint_dir / "1" / "train_state").is_dir()
 
     # test resuming
     config = dataclasses.replace(config, resume=True, num_train_steps=4)
     train.main(config)
+    assert (config.checkpoint_dir / "3" / "train_state").is_dir()

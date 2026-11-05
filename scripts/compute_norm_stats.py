@@ -5,6 +5,11 @@ will compute the mean and standard deviation of the data in the dataset and save
 to the config assets directory.
 """
 
+if __name__ == "__main__":
+    from openpi.diffusion.cli import maybe_dispatch
+
+    maybe_dispatch(stats_only=True)
+
 import numpy as np
 import tqdm
 import tyro

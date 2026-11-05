@@ -1,0 +1,21 @@
+# Human-authored configuration. State/action names are resolved from dataset metadata.
+schema_version: 1
+base: diffusion
+experiment:
+  name: diffusion_pouring_set_1103_delta_obs1
+  dataset: /home/junbo/.cache/huggingface/lerobot/001/revotron_mit_revo3_mit_3cam_pouring_set_junbo_1103
+policy:
+  groups: [left_arm, right_arm, left_hand, right_hand]
+  action_horizon: 16
+model:
+  horizon: 32
+  n_obs_steps: 1
+  num_inference_steps: 20
+training:
+  batch_size: 16
+  microbatch_size: 4
+  num_workers: 4
+  num_steps: 16000
+  precision: bf16
+  save_interval: 2000
+  eval_interval: 1000

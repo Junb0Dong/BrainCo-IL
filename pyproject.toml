@@ -110,10 +110,19 @@ unfixable = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"scripts/train.py" = ["E402"]
+"scripts/train.py" = ["E402", "PLC0415"]
+"src/openpi/training/train_jax.py" = ["E402"]
 "src/openpi/models/act_config.py" = ["PLC0415"]
 "src/openpi/models/pi0_config.py" = ["PLC0415"]
 "src/openpi/policies/policy_config.py" = ["PLC0415"]
+# These modules intentionally dispatch before importing either model runtime.
+"src/openpi/diffusion/checkpoint.py" = ["PLC0415"]
+"src/openpi/diffusion/cli.py" = ["PLC0415"]
+"src/openpi/diffusion/data.py" = ["PLC0415"]
+"src/openpi/diffusion/*_test.py" = ["SLF001"]
+"src/openpi/training/config_io.py" = ["PLC0415"]
+"src/openpi/deploy/contract.py" = ["PLC0415"]
+"scripts/compute_norm_stats.py" = ["E402"]
 
 [tool.ruff.lint.isort]
 force-single-line = true

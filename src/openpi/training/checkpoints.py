@@ -74,6 +74,7 @@ def save_state(
     step: int,
 ):
     """同时保存可恢复的 TrainState 和面向部署的模型参数."""
+
     def save_assets(directory: epath.Path):
         # 保存训练使用的归一化统计量.
         data_config = data_loader.data_config()
@@ -112,7 +113,16 @@ def restore_state(
                 "params": {"params": params},
             },
         )
-    return _merge_params(restored["train_state"], restored["params"])
+    state = _merge_params(restored["train_state"], restored["params"])
+    if jax.default_backend() == "cpu":
+        # On the pinned JAX 0.5.3 / Orbax CPU stack, donating restored buffers
+        # can abort in the native allocator on the first resumed training step.
+        # Materialize fresh buffers before train_step is allowed to reuse them.
+        # GPU restores keep their existing memory/performance behavior.
+        state = jax.block_until_ready(
+            jax.tree.map(lambda value: value.copy() if isinstance(value, jax.Array) else value, state)
+        )
+    return state
 
 
 def load_norm_stats(assets_dir: epath.Path | str, asset_id: str) -> dict[str, _normalize.NormStats] | None:

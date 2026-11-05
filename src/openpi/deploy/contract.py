@@ -50,6 +50,12 @@ def build_policy_contract(
     *,
     dataset_roots: Iterable[str | Path] | None = None,
 ) -> dict[str, Any]:
+    from openpi.diffusion.config import DiffusionTrainConfig
+
+    if isinstance(train_config, DiffusionTrainConfig):
+        from openpi.diffusion.checkpoint import build_contract
+
+        return build_contract(train_config, checkpoint_id)
     policy_io = train_config.data.policy_io
     roots = list(dataset_roots or _dataset_roots(train_config))
     interface = resolve_dataset_interface(roots, policy_io.state_groups)

@@ -1,5 +1,9 @@
 # BrainCo-IL
 
+Diffusion Policy is also available through `base: diffusion` and the existing training/inferencer entrypoints.
+It uses the pinned LeRobot PyTorch implementation, named 56D inputs, arm-relative training targets and
+absolute deployment chunks. See [setup and deployment](docs/diffusion_integration.md).
+
 Deployment compatibility: **revo inference architecture v1.1** (`v1.1` tag).
 
 BrainCo training and inference repository derived from

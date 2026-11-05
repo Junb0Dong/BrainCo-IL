@@ -4,7 +4,7 @@
 
 人工维护：
 
-- BrainCo-IL `experiment.yaml`：训练意图，`base: pi05/act`。
+- BrainCo-IL `experiment.yaml`：训练意图，`base: pi05/act/diffusion`。
 - revo_deploy `robot_profile.yaml`：canonical joint names、ROS wiring、
   controller 与 safety。
 - revo_deploy `inference_backends.yaml`：本机 inferencer command。
@@ -33,7 +33,7 @@ RGB 图像和 task 一起发送 INFER。inferencer 使用训练 dataset 保存�
 和选维，完成：
 
 ```text
-feature selection -> preprocess -> normalize -> PI0.5/ACT -> unnormalize
+feature selection -> preprocess -> normalize -> PI0.5/ACT/DP -> unnormalize -> absolute
 ```
 
 RESULT 固定是 named/grouped absolute hardware action。actor 校验 hash、
@@ -42,3 +42,11 @@ controller 路由。
 
 因此新增推理仓不需要复制 BrainCo 配置，只要实现相同 Policy Inferencer protocol 和
 PolicyContract 即可。
+
+DP 与 JAX 策略使用相同入口。LOAD 根据生成配置选择 runtime；DP 不导入 JAX。
+DP 的 `params/` 为 LeRobot safetensors 格式，归一化参数包含在权重中，并与
+`assets/diffusion_stats.json` 交叉校验。`inference_manifest.json` 覆盖全部推理文件；
+`train_state.pt` 仅用于恢复训练，不传到推理端。
+
+DP 首版支持单帧观测、standard 调度。`model.horizon` 是内部扩散长度，
+contract 的 `chunk_steps` 对应实际返回的 `policy.action_horizon`，两者可以不同。

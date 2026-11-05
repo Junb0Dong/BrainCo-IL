@@ -11,6 +11,7 @@ import traceback
 from typing import Any
 
 import numpy as np
+import yaml
 
 from openpi.deploy.contract import load_policy_contract
 from openpi.deploy.protocol import recv_frame
@@ -62,24 +63,12 @@ def serve(checkpoint: str | Path, *, protocol_in=None, protocol_out=None) -> Non
                 )
             elif message_type == "LOAD":
                 if policy is None:
-                    # Keep DESCRIBE lightweight: importing JAX/model modules is
-                    # intentionally delayed until the LOAD phase.
-                    from openpi import transforms  # noqa: PLC0415
-                    from openpi.policies import policy_config  # noqa: PLC0415
-                    from openpi.training import config_io  # noqa: PLC0415
-
-                    config_io.validate_checkpoint_id(checkpoint, contract["checkpoint_id"])
-                    train_config = config_io.load_train_config(checkpoint)
-                    policy = policy_config.create_trained_policy(
-                        train_config,
-                        checkpoint,
-                        repack_transforms=transforms.Group(inputs=(_ValidateImages(),)),
-                        sample_kwargs=_sample_kwargs(train_config),
-                    )
+                    train_config, candidate_policy = _load_policy(checkpoint, contract)
                     inference_strategy, rtc_config, rtc_initial_delay_steps = _parse_inference_config(
-                        message.get("inference_config"), policy, train_config
+                        message.get("inference_config"), candidate_policy, train_config
                     )
-                    _warmup_if_requested(policy, contract, message)
+                    _warmup_if_requested(candidate_policy, contract, message)
+                    policy = candidate_policy
                 send_frame(
                     protocol_out,
                     {
@@ -134,6 +123,8 @@ def serve(checkpoint: str | Path, *, protocol_in=None, protocol_out=None) -> Non
                     },
                 )
             elif message_type == "RESET":
+                if policy is not None and hasattr(policy, "reset"):
+                    policy.reset()
                 send_frame(protocol_out, {"type": "RESET_DONE"})
             elif message_type == "CLOSE":
                 send_frame(protocol_out, {"type": "CLOSED"})
@@ -150,6 +141,36 @@ def serve(checkpoint: str | Path, *, protocol_in=None, protocol_out=None) -> Non
                     "traceback": traceback.format_exc(),
                 },
             )
+
+
+def _load_policy(checkpoint: Path, contract: dict):
+    from openpi.diffusion.config import is_diffusion_payload  # noqa: PLC0415
+
+    config_path = checkpoint / "train_config.yaml"
+    if config_path.is_file() and is_diffusion_payload(yaml.safe_load(config_path.read_text())):
+        from openpi.diffusion.checkpoint import build_contract  # noqa: PLC0415
+        from openpi.diffusion.checkpoint import load_policy  # noqa: PLC0415
+
+        if load_policy_contract(checkpoint) != contract:
+            raise ValueError("contract changed after DESCRIBE")
+        cfg, policy = load_policy(checkpoint)
+        if build_contract(cfg, contract["checkpoint_id"]) != contract:
+            raise ValueError("loaded DP interface differs from DESCRIBE")
+        return cfg, policy
+
+    from openpi import transforms  # noqa: PLC0415
+    from openpi.policies import policy_config  # noqa: PLC0415
+    from openpi.training import config_io  # noqa: PLC0415
+
+    config_io.validate_checkpoint_id(checkpoint, contract["checkpoint_id"])
+    cfg = config_io.load_train_config(checkpoint)
+    policy = policy_config.create_trained_policy(
+        cfg,
+        checkpoint,
+        repack_transforms=transforms.Group(inputs=(_ValidateImages(),)),
+        sample_kwargs=_sample_kwargs(cfg),
+    )
+    return cfg, policy
 
 
 def _build_policy_observation(observation: dict[str, Any], contract: dict[str, Any]) -> dict[str, Any]:
@@ -197,6 +218,8 @@ def _build_policy_observation(observation: dict[str, Any], contract: dict[str, A
 def _group_actions(actions: np.ndarray, contract: dict[str, Any]) -> dict[str, np.ndarray]:
     if actions.ndim != 2:
         raise ValueError(f"policy actions must be [steps, dim], got {actions.shape}")
+    if actions.shape[0] != int(contract["chunk_steps"]) or not np.all(np.isfinite(actions)):
+        raise ValueError("policy actions have incorrect chunk length or non-finite values")
     groups: dict[str, np.ndarray] = {}
     offset = 0
     for group, names in contract["output_joint_groups"].items():

@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Runtime wrapper for a versioned BrainCo-IL release on revi.
+set -euo pipefail
+unset PYTHONPATH PYTHONHOME VIRTUAL_ENV LD_LIBRARY_PATH
+release_dir="$(cd "$(dirname "$0")/../.." && pwd)"
+export CUDA_VISIBLE_DEVICES=0
+export OPENPI_DATA_HOME=/home/revi/BrainCo/BrainCo-IL-junling-pi05-20261028/.cache/openpi
+export XLA_PYTHON_CLIENT_PREALLOCATE=false
+export JAX_COMPILATION_CACHE_DIR=/home/revi/BrainCo/BrainCo-IL-junling-pi05-20261028/.cache/jax
+export OMP_NUM_THREADS=4
+exec "$release_dir/.venv/bin/python" "$@"

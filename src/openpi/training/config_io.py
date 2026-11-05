@@ -56,6 +56,11 @@ def load_train_config(path_or_dir: str | Path) -> training_config.TrainConfig:
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise RuntimeError(f"train config YAML must parse to a mapping: {path}")
+    from openpi.diffusion.config import is_diffusion_payload
+    from openpi.diffusion.config import load_config
+
+    if is_diffusion_payload(payload):
+        return load_config(path)
     if "base" in payload:
         return _from_experiment_payload(payload, path)
     schema_version = int(payload.get("schema_version", 0) or 0)
@@ -121,6 +126,11 @@ def validate_checkpoint_id(path_or_dir: str | Path, expected: str) -> None:
 
 
 def to_yaml(config: training_config.TrainConfig, *, checkpoint_id: str | None = None) -> str:
+    from openpi.diffusion.config import DiffusionTrainConfig
+    from openpi.diffusion.config import config_yaml
+
+    if isinstance(config, DiffusionTrainConfig):
+        return config_yaml(config, checkpoint_id or config.name)
     config_payload = _to_plain(config)
     payload = {
         "schema_version": CONFIG_SCHEMA_VERSION,
